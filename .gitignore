@@ -1,0 +1,17 @@
+# Secrets
+backend/.env
+
+# Python
+__pycache__/
+*.pyc
+backend/venv/
+backend/*.egg-info
+
+# Node
+frontend/node_modules/
+frontend/dist/
+
+# Test/debug scripts
+backend/test_*.py
+backend/generate_resumes.py
+sample_resumes/
