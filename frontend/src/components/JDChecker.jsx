@@ -60,7 +60,8 @@ export default function JDChecker({ jdData, setJdData, onNext }) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.detail || `Error ${res.status}`);
       }
-      setJdData((p) => ({ ...p, analysis: await res.json() }));
+      const data = await res.json();
+      setJdData((p) => ({ ...p, analysis: data }));
     } catch (e) {
       setError(e.message || "Request failed. Check your connection.");
     } finally {
