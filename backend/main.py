@@ -213,3 +213,38 @@ async def screen_resumes(
 
     results.sort(key=lambda x: x.get("overall_score", 0), reverse=True)
     return JSONResponse(content={"candidates": results})
+
+
+# ── Email Endpoint (Resend) ────────────────────────────────────────────────────
+import httpx
+from pydantic import BaseModel
+
+class EmailRequest(BaseModel):
+    to_email: str
+    candidate_label: str
+    feedback_text: str
+
+@app.post("/send-email")
+async def send_email(payload: EmailRequest):
+    resend_key = os.getenv("RESEND_API_KEY", "")
+    if not resend_key:
+        raise HTTPException(status_code=503, detail="Email service is not configured. Please add RESEND_API_KEY to your environment variables.")
+    try:
+        async with httpx.AsyncClient() as client:
+            res = await client.post(
+                "https://api.resend.com/emails",
+                headers={"Authorization": f"Bearer {resend_key}", "Content-Type": "application/json"},
+                json={
+                    "from":    "ResumeAI <onboarding@resend.dev>",
+                    "to":      [payload.to_email],
+                    "subject": f"Your Application Update — {payload.candidate_label}",
+                    "text":    payload.feedback_text,
+                },
+            )
+        if res.status_code not in (200, 201):
+            raise HTTPException(status_code=502, detail=f"Email provider error: {res.text}")
+        return {"success": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

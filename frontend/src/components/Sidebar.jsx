@@ -9,116 +9,94 @@ const Logo = () => (
   </svg>
 );
 
-const NavIcon = ({ type }) => {
-  if (type === "screening") return (
+const icons = {
+  dashboard: (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-      <rect x="2" y="2" width="12" height="12" rx="3" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M5.5 8h5M8 5.5v5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <rect x="1" y="1" width="6" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.4"/>
+      <rect x="9" y="1" width="6" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.4"/>
+      <rect x="1" y="9" width="6" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.4"/>
+      <rect x="9" y="9" width="6" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.4"/>
     </svg>
-  );
-  if (type === "history") return (
+  ),
+  screening: (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-      <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M8 5v3.5l2 2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <rect x="2" y="2" width="12" height="12" rx="3" stroke="currentColor" strokeWidth="1.4"/>
+      <path d="M5.5 8h5M8 5.5v5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
     </svg>
-  );
-  return null;
+  ),
+  history: (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+      <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.4"/>
+      <path d="M8 5v3.5l2 2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+    </svg>
+  ),
 };
 
 export default function Sidebar({ user, page, setPage, onLogout, onNewScreening }) {
   const initials = (user.name || user.email).substring(0, 2).toUpperCase();
 
   const navItems = [
-    { id: "screening", label: "New Screening" },
-    { id: "history",   label: "History" },
+    { id: "dashboard", label: "Dashboard",     action: () => setPage("dashboard") },
+    { id: "screening", label: "New Screening", action: onNewScreening },
+    { id: "history",   label: "History",       action: () => setPage("history") },
   ];
 
   return (
     <aside style={{
-      width: "var(--sidebar-w)",
-      background: "var(--surface)",
-      borderRight: "1px solid var(--border)",
-      display: "flex",
-      flexDirection: "column",
-      padding: "28px 16px",
-      flexShrink: 0,
-      position: "sticky",
-      top: 0,
-      height: "100vh",
+      width: "var(--sidebar-w)", background: "var(--surface)",
+      borderRight: "1px solid var(--border)", display: "flex",
+      flexDirection: "column", padding: "28px 16px",
+      flexShrink: 0, position: "sticky", top: 0, height: "100vh",
     }}>
       {/* Logo */}
       <div style={{ display: "flex", alignItems: "center", gap: 11, padding: "0 8px", marginBottom: 36 }}>
         <Logo />
         <div>
-          <div style={{ fontSize: 16, fontWeight: 700, color: "var(--text)", letterSpacing: "-0.025em" }}>
-            ResumeAI
-          </div>
-          <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 1, letterSpacing: "0.02em" }}>
-            Precision Hiring Platform
-          </div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: "var(--text)", letterSpacing: "-0.025em" }}>ResumeAI</div>
+          <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 1, letterSpacing: "0.02em" }}>Precision Hiring Platform</div>
         </div>
       </div>
 
-      {/* Nav label */}
-      <div style={{
-        fontSize: 10, fontWeight: 600, color: "var(--text3)",
-        textTransform: "uppercase", letterSpacing: "0.1em",
-        padding: "0 10px", marginBottom: 6,
-      }}>
+      <div style={{ fontSize: 10, fontWeight: 600, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.1em", padding: "0 10px", marginBottom: 6 }}>
         Workspace
       </div>
 
-      {/* Nav items */}
       <nav style={{ flex: 1 }}>
-        {navItems.map((item) => {
-          const isActive = page === item.id;
+        {navItems.map(({ id, label, action }) => {
+          const isActive = page === id || (id === "screening" && page === "screening");
           return (
-            <button
-              key={item.id}
-              onClick={() => item.id === "screening" ? onNewScreening() : setPage(item.id)}
-              style={{
-                width: "100%",
-                display: "flex", alignItems: "center", gap: 10,
-                padding: "9px 10px",
-                background: isActive ? "var(--surface2)" : "transparent",
-                border: isActive ? "1px solid var(--border2)" : "1px solid transparent",
-                borderRadius: 8,
-                color: isActive ? "var(--text)" : "var(--text2)",
-                fontSize: 14,
-                fontWeight: isActive ? 500 : 400,
-                fontFamily: "Inter, sans-serif",
-                cursor: "pointer",
-                marginBottom: 2,
-                transition: "all 0.15s",
-                textAlign: "left",
-                letterSpacing: "-0.01em",
-              }}
-              onMouseEnter={(e) => { if (!isActive) { e.currentTarget.style.background = "var(--surface2)"; e.currentTarget.style.color = "var(--text)"; } }}
-              onMouseLeave={(e) => { if (!isActive) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "var(--text2)"; } }}
+            <button key={id} onClick={action} style={{
+              width: "100%", display: "flex", alignItems: "center", gap: 10,
+              padding: "9px 10px",
+              background: isActive ? "var(--surface2)" : "transparent",
+              border: isActive ? "1px solid var(--border2)" : "1px solid transparent",
+              borderRadius: 8, color: isActive ? "var(--text)" : "var(--text2)",
+              fontSize: 14, fontWeight: isActive ? 500 : 400,
+              fontFamily: "Inter, sans-serif", cursor: "pointer",
+              marginBottom: 2, transition: "all 0.15s", textAlign: "left",
+            }}
+            onMouseEnter={(e) => { if (!isActive) { e.currentTarget.style.background = "var(--surface2)"; e.currentTarget.style.color = "var(--text)"; }}}
+            onMouseLeave={(e) => { if (!isActive) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "var(--text2)"; }}}
             >
               <span style={{ color: isActive ? "var(--accent)" : "currentColor", display: "flex" }}>
-                <NavIcon type={item.id} />
+                {icons[id]}
               </span>
-              {item.label}
+              {label}
             </button>
           );
         })}
       </nav>
 
-      {/* Divider */}
       <div style={{ height: 1, background: "var(--border)", marginBottom: 16 }} />
 
-      {/* User */}
       <div style={{ padding: "0 4px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
           <div style={{
             width: 32, height: 32, borderRadius: 8,
-            background: "var(--accent-muted)", border: "1px solid var(--accent)",
+            background: "var(--accent-muted)", border: "1px solid rgba(59,125,248,0.25)",
             display: "flex", alignItems: "center", justifyContent: "center",
             fontSize: 12, fontWeight: 600, color: "var(--accent)", flexShrink: 0,
-          }}>
-            {initials}
-          </div>
+          }}>{initials}</div>
           <div style={{ overflow: "hidden" }}>
             <div style={{ fontSize: 13, fontWeight: 500, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
               {user.name || "User"}
@@ -128,21 +106,18 @@ export default function Sidebar({ user, page, setPage, onLogout, onNewScreening 
             </div>
           </div>
         </div>
-
-        <button
-          onClick={onLogout}
-          style={{
-            width: "100%", display: "flex", alignItems: "center", gap: 8,
-            padding: "8px 10px", background: "transparent",
-            border: "1px solid transparent", borderRadius: 8,
-            color: "var(--text3)", fontSize: 13, fontFamily: "Inter, sans-serif",
-            cursor: "pointer", transition: "all 0.15s",
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = "var(--danger-muted)"; e.currentTarget.style.color = "var(--danger)"; e.currentTarget.style.borderColor = "rgba(239,68,68,0.2)"; }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "var(--text3)"; e.currentTarget.style.borderColor = "transparent"; }}
+        <button onClick={onLogout} style={{
+          width: "100%", display: "flex", alignItems: "center", gap: 8,
+          padding: "8px 10px", background: "transparent",
+          border: "1px solid transparent", borderRadius: 8,
+          color: "var(--text3)", fontSize: 13, fontFamily: "Inter, sans-serif",
+          cursor: "pointer", transition: "all 0.15s",
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = "var(--danger-muted)"; e.currentTarget.style.color = "var(--danger)"; e.currentTarget.style.borderColor = "rgba(239,68,68,0.2)"; }}
+        onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "var(--text3)"; e.currentTarget.style.borderColor = "transparent"; }}
         >
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <path d="M5 2H2.5A1.5 1.5 0 001 3.5v7A1.5 1.5 0 002.5 12H5M9.5 9.5L13 7l-3.5-2.5M13 7H5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M5 2H2.5A1.5 1.5 0 001 3.5v7A1.5 1.5 0 002.5 12H5M9.5 9.5L13 7l-3.5-2.5M13 7H5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
           Sign Out
         </button>
