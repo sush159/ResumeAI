@@ -4,12 +4,12 @@ const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 const STATUSES = ["To Review", "Contacted", "Interviewing", "Offer Sent", "Hired", "Declined"];
 const statusColor = (s) => ({
-  "To Review":   "var(--text3)",
-  "Contacted":   "var(--accent)",
-  "Interviewing":"var(--warning)",
-  "Offer Sent":  "#a78bfa",
-  "Hired":       "var(--success)",
-  "Declined":    "var(--danger)",
+  "To Review":    "var(--text3)",
+  "Contacted":    "var(--accent)",
+  "Interviewing": "var(--warning)",
+  "Offer Sent":   "#a78bfa",
+  "Hired":        "var(--success)",
+  "Declined":     "var(--danger)",
 }[s] || "var(--text3)");
 
 const StepBar = ({ current }) => (
@@ -20,19 +20,20 @@ const StepBar = ({ current }) => (
         <div key={label} style={{ display: "flex", alignItems: "center" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <div style={{
-              width: 26, height: 26, borderRadius: "50%",
-              background: done ? "var(--success)" : active ? "var(--accent)" : "var(--surface2)",
-              border: `1px solid ${done ? "var(--success)" : active ? "var(--accent)" : "var(--border2)"}`,
+              width: 28, height: 28, borderRadius: "50%",
+              background: done ? "var(--success)" : active ? "linear-gradient(135deg, var(--g1), var(--g2))" : "var(--surface2)",
+              border: `1px solid ${done ? "var(--success)" : active ? "transparent" : "var(--border2)"}`,
               display: "flex", alignItems: "center", justifyContent: "center",
               fontSize: 11, fontWeight: 600, color: done || active ? "white" : "var(--text3)", flexShrink: 0,
+              boxShadow: active ? "0 4px 14px rgba(99,102,241,0.4)" : "none",
             }}>
-              {done ? <svg width="12" height="12" viewBox="0 0 12 12"><path d="M2.5 6l2.5 2.5L9.5 3.5" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg> : num}
+              {done ? <svg width="12" height="12" viewBox="0 0 12 12"><path d="M2.5 6l2.5 2.5L9.5 3.5" stroke="white" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg> : num}
             </div>
-            <span style={{ fontSize: 13, fontWeight: active ? 500 : 400, color: active ? "var(--text)" : done ? "var(--text2)" : "var(--text3)" }}>
+            <span style={{ fontSize: 13, fontWeight: active ? 600 : 400, color: active ? "var(--text)" : done ? "var(--text2)" : "var(--text3)" }}>
               {label}
             </span>
           </div>
-          {i < 2 && <div style={{ width: 40, height: 1, background: done ? "var(--success)" : "var(--border)", margin: "0 12px" }} />}
+          {i < 2 && <div style={{ width: 44, height: 1, background: done ? "var(--success)" : "var(--border)", margin: "0 12px" }} />}
         </div>
       );
     })}
@@ -41,6 +42,51 @@ const StepBar = ({ current }) => (
 
 const scoreColor = (s) => s >= 75 ? "var(--success)" : s >= 50 ? "var(--warning)" : "var(--danger)";
 const recColor   = (r) => ({ Shortlist: "var(--success)", Maybe: "var(--warning)", Reject: "var(--danger)" }[r] || "var(--text3)");
+
+// Circular SVG score ring
+function ScoreRing({ score, size = 72, strokeWidth = 6 }) {
+  if (score == null) return <div style={{ width: size, height: size, flexShrink: 0 }} />;
+  const radius = (size - strokeWidth * 2) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const filled = (score / 100) * circumference;
+  const color = scoreColor(score);
+
+  return (
+    <div style={{ width: size, height: size, position: "relative", flexShrink: 0 }}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ transform: "rotate(-90deg)" }}>
+        <circle cx={size/2} cy={size/2} r={radius} fill="none" stroke="var(--surface3)" strokeWidth={strokeWidth} />
+        <circle
+          cx={size/2} cy={size/2} r={radius} fill="none"
+          stroke={color} strokeWidth={strokeWidth}
+          strokeDasharray={`${filled} ${circumference}`}
+          strokeLinecap="round"
+          style={{ transition: "stroke-dasharray 1s cubic-bezier(.22,.68,0,1.2)" }}
+        />
+      </svg>
+      <div style={{
+        position: "absolute", inset: 0,
+        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+      }}>
+        <div style={{ fontSize: size === 72 ? 20 : 14, fontWeight: 800, color, lineHeight: 1, letterSpacing: "-0.03em" }}>{score}</div>
+      </div>
+    </div>
+  );
+}
+
+// Score row with bar
+const ScoreBar = ({ label, score }) => (
+  <div style={{ marginBottom: 12 }}>
+    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
+      <span style={{ fontSize: 12, color: "var(--text3)" }}>{label}</span>
+      <span style={{ fontSize: 12, fontWeight: 700, color: score != null ? scoreColor(score) : "var(--text3)" }}>{score != null ? score : "—"}</span>
+    </div>
+    {score != null && (
+      <div className="track">
+        <div className="fill" style={{ width: `${score}%`, background: scoreColor(score) }} />
+      </div>
+    )}
+  </div>
+);
 
 // Email Modal
 function EmailModal({ candidate, onClose }) {
@@ -75,20 +121,27 @@ function EmailModal({ candidate, onClose }) {
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal fade-up" onClick={(e) => e.stopPropagation()}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-          <div style={{ fontSize: 16, fontWeight: 600, color: "var(--text)" }}>Send Feedback Email</div>
-          <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--text3)", cursor: "pointer", fontSize: 20 }}>×</button>
+        {/* Header */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: "var(--text)", letterSpacing: "-0.02em" }}>Send Feedback Email</div>
+            <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 2 }}>{candidate.candidate_label}</div>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--text3)", cursor: "pointer", fontSize: 20, lineHeight: 1, padding: "4px 8px" }}>×</button>
         </div>
 
         {sent ? (
-          <div style={{ textAlign: "center", padding: "24px 0" }}>
-            <div style={{ fontSize: 36, marginBottom: 12, color: "var(--success)" }}>
-              <svg width="40" height="40" viewBox="0 0 40 40" fill="none" style={{ margin: "0 auto" }}>
-                <circle cx="20" cy="20" r="18" fill="var(--success-muted)" stroke="var(--success)" strokeWidth="1.5"/>
-                <path d="M12 20l5.5 5.5L28 14" stroke="var(--success)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          <div style={{ textAlign: "center", padding: "28px 0" }}>
+            <div style={{
+              width: 56, height: 56, borderRadius: "50%", margin: "0 auto 16px",
+              background: "var(--success-muted)", border: "2px solid var(--success)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <path d="M5 12l4.5 4.5L19 7" stroke="var(--success)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </div>
-            <div style={{ fontSize: 15, fontWeight: 500, color: "var(--text)", marginBottom: 6 }}>Email sent successfully</div>
+            <div style={{ fontSize: 16, fontWeight: 600, color: "var(--text)", marginBottom: 6 }}>Email sent successfully</div>
             <div style={{ fontSize: 13, color: "var(--text3)" }}>Feedback sent to {email}</div>
             <button className="btn btn-secondary btn-sm" onClick={onClose} style={{ marginTop: 20 }}>Close</button>
           </div>
@@ -102,14 +155,14 @@ function EmailModal({ candidate, onClose }) {
               <label>Feedback Message</label>
               <div style={{
                 padding: 14, background: "var(--surface2)", border: "1px solid var(--border2)",
-                borderRadius: 8, fontSize: 13, color: "var(--text2)", lineHeight: 1.7,
+                borderRadius: 9, fontSize: 13, color: "var(--text2)", lineHeight: 1.7,
                 maxHeight: 180, overflowY: "auto",
               }}>
                 {candidate.feedback_email}
               </div>
             </div>
             {error && (
-              <div style={{ padding: "9px 14px", background: "var(--danger-muted)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: 8, fontSize: 13, color: "var(--danger)", marginBottom: 16 }}>
+              <div style={{ padding: "10px 14px", background: "var(--danger-muted)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: 8, fontSize: 13, color: "var(--danger)", marginBottom: 16 }}>
                 {error}
               </div>
             )}
@@ -126,20 +179,16 @@ function EmailModal({ candidate, onClose }) {
   );
 }
 
-// Score bar
-const ScoreBar = ({ label, score }) => (
-  <div style={{ marginBottom: 14 }}>
-    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
-      <span style={{ fontSize: 12, color: "var(--text3)", fontWeight: 500 }}>{label}</span>
-      <span style={{ fontSize: 12, fontWeight: 600, color: score != null ? scoreColor(score) : "var(--text3)" }}>{score != null ? score : "—"}</span>
-    </div>
-    {score != null && <div className="track"><div className="fill" style={{ width: `${score}%`, background: scoreColor(score) }} /></div>}
-  </div>
-);
-
-function CandidateCard({ candidate, rank, status, onStatusChange, onSendEmail }) {
+function CandidateCard({ candidate, rank, status, onStatusChange }) {
   const [expanded,  setExpanded]  = useState(false);
   const [showEmail, setShowEmail] = useState(false);
+
+  const rankColors = {
+    1: { bg: "linear-gradient(135deg, rgba(245,158,11,0.15), rgba(217,119,6,0.08))", border: "rgba(245,158,11,0.35)", text: "#f59e0b" },
+    2: { bg: "linear-gradient(135deg, rgba(148,163,184,0.1), rgba(100,116,139,0.06))", border: "rgba(148,163,184,0.2)", text: "#94a3b8" },
+    3: { bg: "linear-gradient(135deg, rgba(180,120,60,0.1), rgba(120,80,40,0.06))", border: "rgba(180,120,60,0.2)", text: "#c47c3e" },
+  };
+  const rankStyle = rankColors[rank] || { bg: "var(--surface2)", border: "var(--border)", text: "var(--text3)" };
 
   if (candidate.error) {
     return (
@@ -155,23 +204,37 @@ function CandidateCard({ candidate, rank, status, onStatusChange, onSendEmail })
   return (
     <>
       {showEmail && <EmailModal candidate={candidate} onClose={() => setShowEmail(false)} />}
-      <div className="card fade-up" style={{ marginBottom: 12, borderColor: expanded ? "var(--border2)" : "var(--border)", transition: "border-color 0.15s" }}>
-        {/* Header */}
+      <div style={{
+        background: "var(--surface)", border: `1px solid ${expanded ? "rgba(99,102,241,0.3)" : "var(--border)"}`,
+        borderRadius: 14, padding: "18px 22px", marginBottom: 10,
+        transition: "all 0.2s",
+        boxShadow: expanded ? "0 0 30px rgba(99,102,241,0.06)" : "none",
+      }}>
+        {/* Rank bar accent */}
+        <div style={{
+          position: "absolute", left: 0, top: 0, bottom: 0, width: 3,
+          background: rank <= 3 ? rankStyle.text : "transparent",
+          borderRadius: "14px 0 0 14px",
+        }} />
+
+        {/* Header row */}
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          {/* Rank */}
+          {/* Rank badge */}
           <div style={{
-            width: 36, height: 36, borderRadius: 8, flexShrink: 0,
-            background: rank === 1 ? "var(--warning-muted)" : "var(--surface2)",
-            border: `1px solid ${rank === 1 ? "rgba(234,179,8,0.3)" : "var(--border)"}`,
+            width: 38, height: 38, borderRadius: 9, flexShrink: 0,
+            background: rankStyle.bg,
+            border: `1px solid ${rankStyle.border}`,
             display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 12, fontWeight: 600, color: rank === 1 ? "var(--warning)" : "var(--text3)",
+            fontSize: 12, fontWeight: 700, color: rankStyle.text,
           }}>#{rank}</div>
 
-          {/* Label + summary — clickable to expand */}
+          {/* Label + summary */}
           <div style={{ flex: 1, minWidth: 0, cursor: "pointer" }} onClick={() => setExpanded(!expanded)}>
-            <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)", marginBottom: 3 }}>{candidate.candidate_label}</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text)", marginBottom: 3, letterSpacing: "-0.01em" }}>
+              {candidate.candidate_label}
+            </div>
             <p style={{ fontSize: 12, color: "var(--text3)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {candidate.summary?.substring(0, 110)}...
+              {candidate.summary?.substring(0, 115)}...
             </p>
           </div>
 
@@ -182,30 +245,28 @@ function CandidateCard({ candidate, rank, status, onStatusChange, onSendEmail })
             onClick={(e) => e.stopPropagation()}
             style={{
               width: "auto", padding: "5px 10px", fontSize: 12, flexShrink: 0,
-              color: statusColor(status || "To Review"), borderColor: statusColor(status || "To Review") + "44",
+              color: statusColor(status || "To Review"),
+              borderColor: statusColor(status || "To Review") + "44",
               background: statusColor(status || "To Review") + "11",
             }}
           >
             {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
 
-          {/* Score */}
-          <div style={{ textAlign: "center", flexShrink: 0, cursor: "pointer" }} onClick={() => setExpanded(!expanded)}>
-            <div style={{ fontSize: 28, fontWeight: 700, color: scoreColor(candidate.overall_score), lineHeight: 1, letterSpacing: "-0.03em" }}>
-              {candidate.overall_score}
-            </div>
-            <div style={{ fontSize: 10, color: "var(--text3)", marginTop: 2, textTransform: "uppercase", letterSpacing: "0.06em" }}>Score</div>
+          {/* Score ring */}
+          <div style={{ cursor: "pointer" }} onClick={() => setExpanded(!expanded)}>
+            <ScoreRing score={candidate.overall_score} size={52} strokeWidth={5} />
           </div>
 
-          {/* Recommendation */}
+          {/* Recommendation badge */}
           <span style={{
-            padding: "4px 12px", borderRadius: 6, fontSize: 12, fontWeight: 500, flexShrink: 0,
+            padding: "5px 13px", borderRadius: 7, fontSize: 12, fontWeight: 600, flexShrink: 0,
             background: recColor(candidate.recommendation) + "15",
             color: recColor(candidate.recommendation),
             border: `1px solid ${recColor(candidate.recommendation)}30`,
           }}>{candidate.recommendation}</span>
 
-          {/* Expand chevron */}
+          {/* Chevron */}
           <div style={{ color: "var(--text3)", transition: "transform 0.2s", transform: expanded ? "rotate(180deg)" : "none", flexShrink: 0, cursor: "pointer" }}
             onClick={() => setExpanded(!expanded)}>
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -214,33 +275,56 @@ function CandidateCard({ candidate, rank, status, onStatusChange, onSendEmail })
           </div>
         </div>
 
-        {/* Expanded */}
+        {/* Expanded detail */}
         {expanded && (
-          <div className="fade-up" style={{ marginTop: 20, paddingTop: 20, borderTop: "1px solid var(--border)" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, marginBottom: 20 }}>
+          <div className="fade-up" style={{ marginTop: 22, paddingTop: 22, borderTop: "1px solid var(--border)" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 28, marginBottom: 20 }}>
+              {/* Score breakdown */}
               <div>
-                <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 14 }}>Score Breakdown</div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 16 }}>Score Breakdown</div>
                 <ScoreBar label="JD Match"        score={candidate.jd_match_score} />
                 <ScoreBar label="Skills"          score={candidate.skills_score} />
                 <ScoreBar label="Custom Criteria" score={candidate.custom_criteria_score} />
                 <ScoreBar label="Overall"         score={candidate.overall_score} />
               </div>
+              {/* Strengths & Gaps */}
               <div>
-                <div style={{ fontSize: 11, fontWeight: 600, color: "var(--success)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>Strengths</div>
-                {candidate.strengths?.map((s, i) => <div key={i} style={{ fontSize: 13, color: "var(--text2)", padding: "4px 0" }}>— {s}</div>)}
-                <div style={{ fontSize: 11, fontWeight: 600, color: "var(--danger)", textTransform: "uppercase", letterSpacing: "0.08em", marginTop: 14, marginBottom: 10 }}>Gaps</div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "var(--success)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 12 }}>Strengths</div>
+                {candidate.strengths?.map((s, i) => (
+                  <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 13, color: "var(--text2)", marginBottom: 6, lineHeight: 1.4 }}>
+                    <div style={{ width: 5, height: 5, borderRadius: "50%", background: "var(--success)", flexShrink: 0, marginTop: 5 }} />
+                    {s}
+                  </div>
+                ))}
+                <div style={{ fontSize: 11, fontWeight: 700, color: "var(--danger)", textTransform: "uppercase", letterSpacing: "0.1em", marginTop: 18, marginBottom: 12 }}>Gaps</div>
                 {candidate.gaps?.length
-                  ? candidate.gaps.map((g, i) => <div key={i} style={{ fontSize: 13, color: "var(--text3)", padding: "4px 0" }}>— {g}</div>)
+                  ? candidate.gaps.map((g, i) => (
+                      <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 13, color: "var(--text3)", marginBottom: 6, lineHeight: 1.4 }}>
+                        <div style={{ width: 5, height: 5, borderRadius: "50%", background: "var(--danger)", flexShrink: 0, marginTop: 5 }} />
+                        {g}
+                      </div>
+                    ))
                   : <div style={{ fontSize: 13, color: "var(--text3)" }}>No significant gaps noted.</div>
                 }
               </div>
             </div>
-            <div style={{ padding: 16, background: "var(--surface2)", borderRadius: 8, fontSize: 13, color: "var(--text2)", lineHeight: 1.7, marginBottom: 16, border: "1px solid var(--border)" }}>
+
+            {/* Summary */}
+            <div style={{
+              padding: "14px 16px", background: "var(--surface2)", borderRadius: 10,
+              fontSize: 13, color: "var(--text2)", lineHeight: 1.75,
+              marginBottom: 16, border: "1px solid var(--border)",
+            }}>
               {candidate.summary}
             </div>
-            <div style={{ display: "flex", gap: 10 }}>
-              <button className="btn btn-secondary btn-sm" onClick={() => setShowEmail(true)}>Send Feedback Email</button>
-            </div>
+
+            <button className="btn btn-secondary btn-sm" onClick={() => setShowEmail(true)}>
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                <rect x="1" y="2.5" width="11" height="8" rx="2" stroke="currentColor" strokeWidth="1.3"/>
+                <path d="M1 4.5l5.5 3.5 5.5-3.5" stroke="currentColor" strokeWidth="1.3"/>
+              </svg>
+              Send Feedback Email
+            </button>
           </div>
         )}
       </div>
@@ -289,47 +373,68 @@ export default function Results({ results, onReset, onStatusChange, sessionId, u
     <div className="fade-up">
       <StepBar current={3} />
 
+      {/* Header */}
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 32 }}>
         <div>
-          <h1 style={{ fontSize: 26, fontWeight: 700, color: "var(--text)", marginBottom: 8 }}>Screening Results</h1>
+          <h1 style={{ fontSize: 28, fontWeight: 800, letterSpacing: "-0.04em", marginBottom: 8 }}>
+            <span className="grad-text">Screening Results</span>
+          </h1>
           <p style={{ fontSize: 14, color: "var(--text2)" }}>
             {candidates.length} candidate{candidates.length !== 1 ? "s" : ""} evaluated and ranked by overall fit.
           </p>
         </div>
         <button className="btn btn-secondary btn-sm" onClick={exportCSV} style={{ flexShrink: 0, marginLeft: 20 }}>
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <path d="M7 1v8M4 6l3 3 3-3M2 11h10" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+            <path d="M6.5 1v8M3.5 6.5l3 2.5 3-2.5M1.5 11h10" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
           Export CSV
         </button>
       </div>
 
-      {/* Summary stats */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginBottom: 28 }}>
+      {/* Summary stat cards */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginBottom: 32 }}>
         {[
-          { label: "Shortlisted",     count: shortlisted, color: "var(--success)" },
-          { label: "Under Review",    count: maybe,       color: "var(--warning)" },
-          { label: "Not Progressing", count: rejected,    color: "var(--danger)"  },
-        ].map(({ label, count, color }) => (
-          <div key={label} className="card" style={{ textAlign: "center", borderColor: color + "22", padding: "20px 16px" }}>
-            <div style={{ fontSize: 36, fontWeight: 700, color, lineHeight: 1, letterSpacing: "-0.03em" }}>{count}</div>
-            <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 6, fontWeight: 500 }}>{label}</div>
+          { label: "Shortlisted",     count: shortlisted, color: "var(--success)", muted: "var(--success-muted)", grad: "linear-gradient(135deg, rgba(16,185,129,0.15), rgba(5,150,105,0.08))" },
+          { label: "Under Review",    count: maybe,       color: "var(--warning)", muted: "var(--warning-muted)", grad: "linear-gradient(135deg, rgba(245,158,11,0.12), rgba(217,119,6,0.06))" },
+          { label: "Not Progressing", count: rejected,    color: "var(--danger)",  muted: "var(--danger-muted)",  grad: "linear-gradient(135deg, rgba(239,68,68,0.1), rgba(220,38,38,0.05))" },
+        ].map(({ label, count, color, grad }) => (
+          <div key={label} style={{
+            borderRadius: 14, padding: "20px 22px",
+            background: grad,
+            border: `1px solid ${color}22`,
+            textAlign: "center",
+            transition: "transform 0.2s",
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.transform = "translateY(-2px)")}
+          onMouseLeave={(e) => (e.currentTarget.style.transform = "")}
+          >
+            <div style={{ fontSize: 42, fontWeight: 800, color, lineHeight: 1, letterSpacing: "-0.04em", marginBottom: 6 }}>{count}</div>
+            <div style={{ fontSize: 12, fontWeight: 600, color, opacity: 0.85 }}>{label}</div>
           </div>
         ))}
       </div>
 
-      {candidates.map((c, i) => (
-        <CandidateCard
-          key={c.candidate_label}
-          candidate={c}
-          rank={i + 1}
-          status={statuses[c.candidate_label]}
-          onStatusChange={handleStatusChange}
-        />
-      ))}
+      {/* Candidate Cards */}
+      <div style={{ position: "relative" }}>
+        {candidates.map((c, i) => (
+          <CandidateCard
+            key={c.candidate_label}
+            candidate={c}
+            rank={i + 1}
+            status={statuses[c.candidate_label]}
+            onStatusChange={handleStatusChange}
+          />
+        ))}
+      </div>
 
-      <div style={{ marginTop: 28, paddingTop: 24, borderTop: "1px solid var(--border)" }}>
-        <button className="btn btn-secondary" onClick={onReset}>Start New Screening</button>
+      <div style={{ marginTop: 32, paddingTop: 24, borderTop: "1px solid var(--border)" }}>
+        <button className="btn btn-secondary" onClick={onReset}>
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+            <path d="M2 6.5A4.5 4.5 0 1 1 6.5 11" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+            <path d="M2 3.5v3h3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          Start New Screening
+        </button>
       </div>
     </div>
   );

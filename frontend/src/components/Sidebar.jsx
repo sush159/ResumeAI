@@ -1,33 +1,22 @@
-const Logo = () => (
-  <svg width="34" height="34" viewBox="0 0 40 40" fill="none">
-    <rect width="40" height="40" rx="10" fill="#3b7df8" />
-    <rect x="10" y="11" width="20" height="2.5" rx="1.25" fill="white" />
-    <rect x="10" y="17" width="14" height="2.5" rx="1.25" fill="white" />
-    <rect x="10" y="23" width="16" height="2.5" rx="1.25" fill="white" />
-    <circle cx="30" cy="29" r="6" fill="#22c55e" />
-    <path d="M27.5 29l1.8 1.8L33 27" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
-
 const icons = {
   dashboard: (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-      <rect x="1" y="1" width="6" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.4"/>
-      <rect x="9" y="1" width="6" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.4"/>
-      <rect x="1" y="9" width="6" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.4"/>
-      <rect x="9" y="9" width="6" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.4"/>
+    <svg width="17" height="17" viewBox="0 0 17 17" fill="none">
+      <rect x="1.5" y="1.5" width="6" height="6" rx="1.8" stroke="currentColor" strokeWidth="1.4"/>
+      <rect x="9.5" y="1.5" width="6" height="6" rx="1.8" stroke="currentColor" strokeWidth="1.4"/>
+      <rect x="1.5" y="9.5" width="6" height="6" rx="1.8" stroke="currentColor" strokeWidth="1.4"/>
+      <rect x="9.5" y="9.5" width="6" height="6" rx="1.8" stroke="currentColor" strokeWidth="1.4"/>
     </svg>
   ),
   screening: (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-      <rect x="2" y="2" width="12" height="12" rx="3" stroke="currentColor" strokeWidth="1.4"/>
-      <path d="M5.5 8h5M8 5.5v5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+    <svg width="17" height="17" viewBox="0 0 17 17" fill="none">
+      <rect x="2" y="2" width="13" height="13" rx="3" stroke="currentColor" strokeWidth="1.4"/>
+      <path d="M8.5 5.5v6M5.5 8.5h6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
     </svg>
   ),
   history: (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-      <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.4"/>
-      <path d="M8 5v3.5l2 2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+    <svg width="17" height="17" viewBox="0 0 17 17" fill="none">
+      <circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" strokeWidth="1.4"/>
+      <path d="M8.5 5v3.8l2.2 2.2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
   ),
 };
@@ -45,20 +34,32 @@ export default function Sidebar({ user, page, setPage, onLogout, onNewScreening 
     <aside style={{
       width: "var(--sidebar-w)", background: "var(--surface)",
       borderRight: "1px solid var(--border)", display: "flex",
-      flexDirection: "column", padding: "28px 16px",
+      flexDirection: "column", padding: "24px 14px",
       flexShrink: 0, position: "sticky", top: 0, height: "100vh",
     }}>
       {/* Logo */}
-      <div style={{ display: "flex", alignItems: "center", gap: 11, padding: "0 8px", marginBottom: 36 }}>
-        <Logo />
+      <div style={{ display: "flex", alignItems: "center", gap: 11, padding: "4px 8px", marginBottom: 36 }}>
+        <div style={{
+          width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+          background: "linear-gradient(135deg, var(--g1), var(--g2))",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          boxShadow: "0 4px 16px rgba(99,102,241,0.35)",
+        }}>
+          <svg width="18" height="18" viewBox="0 0 22 22" fill="none">
+            <rect x="3" y="2" width="16" height="18" rx="3" stroke="white" strokeWidth="1.6"/>
+            <path d="M7 7h8M7 11h6M7 15h4" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+            <circle cx="17" cy="17" r="4.5" fill="#22c55e" stroke="white" strokeWidth="1.2"/>
+            <path d="M15.3 17l1.2 1.2 2.4-2.4" stroke="white" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </div>
         <div>
-          <div style={{ fontSize: 16, fontWeight: 700, color: "var(--text)", letterSpacing: "-0.025em" }}>ResumeAI</div>
-          <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 1, letterSpacing: "0.02em" }}>Precision Hiring Platform</div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text)", letterSpacing: "-0.025em" }}>ResumeAI</div>
+          <div style={{ fontSize: 10, color: "var(--text3)", marginTop: 1, letterSpacing: "0.04em", textTransform: "uppercase" }}>Precision Hiring</div>
         </div>
       </div>
 
-      <div style={{ fontSize: 10, fontWeight: 600, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.1em", padding: "0 10px", marginBottom: 6 }}>
-        Workspace
+      <div style={{ fontSize: 10, fontWeight: 600, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.1em", padding: "0 10px", marginBottom: 8 }}>
+        Menu
       </div>
 
       <nav style={{ flex: 1 }}>
@@ -68,36 +69,62 @@ export default function Sidebar({ user, page, setPage, onLogout, onNewScreening 
             <button key={id} onClick={action} style={{
               width: "100%", display: "flex", alignItems: "center", gap: 10,
               padding: "9px 10px",
-              background: isActive ? "var(--surface2)" : "transparent",
-              border: isActive ? "1px solid var(--border2)" : "1px solid transparent",
-              borderRadius: 8, color: isActive ? "var(--text)" : "var(--text2)",
-              fontSize: 14, fontWeight: isActive ? 500 : 400,
+              background: isActive ? "linear-gradient(135deg, rgba(99,102,241,0.12), rgba(59,130,246,0.08))" : "transparent",
+              border: isActive ? "1px solid rgba(99,102,241,0.22)" : "1px solid transparent",
+              borderRadius: 9, color: isActive ? "var(--text)" : "var(--text2)",
+              fontSize: 13.5, fontWeight: isActive ? 500 : 400,
               fontFamily: "Inter, sans-serif", cursor: "pointer",
-              marginBottom: 2, transition: "all 0.15s", textAlign: "left",
+              marginBottom: 3, transition: "all 0.15s", textAlign: "left",
             }}
             onMouseEnter={(e) => { if (!isActive) { e.currentTarget.style.background = "var(--surface2)"; e.currentTarget.style.color = "var(--text)"; }}}
             onMouseLeave={(e) => { if (!isActive) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "var(--text2)"; }}}
             >
-              <span style={{ color: isActive ? "var(--accent)" : "currentColor", display: "flex" }}>
+              <span style={{
+                color: isActive ? "var(--g1)" : "currentColor", display: "flex", flexShrink: 0,
+              }}>
                 {icons[id]}
               </span>
               {label}
+              {isActive && (
+                <span style={{
+                  marginLeft: "auto", width: 6, height: 6, borderRadius: "50%",
+                  background: "linear-gradient(135deg, var(--g1), var(--g2))",
+                  flexShrink: 0,
+                }} />
+              )}
             </button>
           );
         })}
       </nav>
 
-      <div style={{ height: 1, background: "var(--border)", marginBottom: 16 }} />
+      {/* Upgrade hint (decorative) */}
+      <div style={{
+        margin: "12px 4px 16px",
+        padding: "14px 12px",
+        background: "linear-gradient(135deg, rgba(99,102,241,0.08), rgba(59,130,246,0.06))",
+        border: "1px solid rgba(99,102,241,0.15)",
+        borderRadius: 10,
+      }}>
+        <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text)", marginBottom: 4 }}>
+          Data stored locally
+        </div>
+        <div style={{ fontSize: 11, color: "var(--text3)", lineHeight: 1.5 }}>
+          All screening history is saved in your browser.
+        </div>
+      </div>
+
+      <div style={{ height: 1, background: "var(--border)", marginBottom: 14 }} />
 
       <div style={{ padding: "0 4px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
           <div style={{
-            width: 32, height: 32, borderRadius: 8,
-            background: "var(--accent-muted)", border: "1px solid rgba(59,125,248,0.25)",
+            width: 32, height: 32, borderRadius: 9, flexShrink: 0,
+            background: "linear-gradient(135deg, rgba(99,102,241,0.2), rgba(59,130,246,0.15))",
+            border: "1px solid rgba(99,102,241,0.25)",
             display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 12, fontWeight: 600, color: "var(--accent)", flexShrink: 0,
+            fontSize: 12, fontWeight: 700, color: "var(--g1)",
           }}>{initials}</div>
-          <div style={{ overflow: "hidden" }}>
+          <div style={{ overflow: "hidden", flex: 1 }}>
             <div style={{ fontSize: 13, fontWeight: 500, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
               {user.name || "User"}
             </div>
