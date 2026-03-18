@@ -52,16 +52,23 @@ function EmailModal({ candidate, onClose }) {
   const handleSend = async () => {
     if (!email.trim()) { setError("Please enter a recipient email address."); return; }
     setSending(true); setError("");
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
     try {
       const res = await fetch(`${API_BASE}/send-email`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ to_email: email, candidate_label: candidate.candidate_label, feedback_text: candidate.feedback_email }),
+        signal: controller.signal,
       });
-      if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.detail || "Failed to send"); }
+      clearTimeout(timeout);
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d.detail || `Error ${res.status}`);
       setSent(true);
     } catch (e) {
-      setError(e.message || "Failed to send email.");
+      clearTimeout(timeout);
+      if (e.name === "AbortError") setError("Request timed out. The server may be waking up — please try again in 30 seconds.");
+      else setError(e.message || "Failed to send email.");
     } finally { setSending(false); }
   };
 
