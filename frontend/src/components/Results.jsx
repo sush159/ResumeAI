@@ -99,7 +99,7 @@ function EmailModal({ candidate, onClose }) {
     if (!email.trim()) { setError("Please enter a recipient email address."); return; }
     setSending(true); setError("");
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 30000);
+    const timeout = setTimeout(() => controller.abort(), 90000);
     try {
       const res = await fetch(`${API_BASE}/send-email`, {
         method: "POST",
@@ -113,7 +113,7 @@ function EmailModal({ candidate, onClose }) {
       setSent(true);
     } catch (e) {
       clearTimeout(timeout);
-      if (e.name === "AbortError") setError("Request timed out. The server may be waking up — please try again in 30 seconds.");
+      if (e.name === "AbortError") setError("Request timed out. The server is still waking up — please try again in a moment.");
       else setError(e.message || "Failed to send email.");
     } finally { setSending(false); }
   };
