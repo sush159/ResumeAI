@@ -393,52 +393,34 @@ async def screen_resumes(
 
 
 # ── Email Endpoint ─────────────────────────────────────────────────────────────
-import smtplib
-import asyncio
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+import httpx
 
 class EmailRequest(BaseModel):
     to_email: str
     candidate_label: str
     feedback_text: str
 
-def _send_via_gmail(gmail_user: str, gmail_password: str, to_email: str, subject: str, body: str):
-    """Synchronous Gmail SMTP send — runs in a thread pool so it doesn't block."""
-    msg = MIMEMultipart()
-    msg["From"]    = f"ResumeAI <{gmail_user}>"
-    msg["To"]      = to_email
-    msg["Subject"] = subject
-    msg.attach(MIMEText(body, "plain"))
-    # 30s timeout so SMTP never hangs indefinitely
-    with smtplib.SMTP("smtp.gmail.com", 587, timeout=30) as server:
-        server.ehlo()
-        server.starttls()
-        server.ehlo()
-        server.login(gmail_user, gmail_password)
-        server.sendmail(gmail_user, to_email, msg.as_string())
-
 @app.post("/send-email")
 async def send_email(payload: EmailRequest):
-    gmail_user     = os.getenv("GMAIL_USER", "")
-    gmail_password = os.getenv("GMAIL_APP_PASSWORD", "")
-    if not gmail_user or not gmail_password:
-        raise HTTPException(status_code=503, detail="Email service is not configured. Add GMAIL_USER and GMAIL_APP_PASSWORD to your environment variables.")
+    resend_key = os.getenv("RESEND_API_KEY", "")
+    if not resend_key:
+        raise HTTPException(status_code=503, detail="Email service is not configured. Add RESEND_API_KEY to your environment variables.")
     try:
-        await asyncio.to_thread(
-            _send_via_gmail,
-            gmail_user,
-            gmail_password,
-            payload.to_email,
-            f"Your Application Update — {payload.candidate_label}",
-            payload.feedback_text,
-        )
+        async with httpx.AsyncClient(timeout=30) as client:
+            res = await client.post(
+                "https://api.resend.com/emails",
+                headers={"Authorization": f"Bearer {resend_key}", "Content-Type": "application/json"},
+                json={
+                    "from":    "ResumeAI <onboarding@resend.dev>",
+                    "to":      [payload.to_email],
+                    "subject": f"Your Application Update — {payload.candidate_label}",
+                    "text":    payload.feedback_text,
+                },
+            )
+        if res.status_code not in (200, 201):
+            raise HTTPException(status_code=502, detail=f"Email provider error: {res.text}")
         return {"success": True}
-    except smtplib.SMTPAuthenticationError:
-        raise HTTPException(status_code=401, detail="Gmail authentication failed. Make sure you're using an App Password, not your regular Gmail password.")
-    except smtplib.SMTPException as e:
-        raise HTTPException(status_code=502, detail=f"SMTP error: {str(e)}")
-    except TimeoutError:
-        raise HTTPException(status_code=504, detail="Connection to Gmail timed out. Please try again.")
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"{type(e).__name__}: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
