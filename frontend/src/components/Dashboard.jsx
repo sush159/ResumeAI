@@ -1,5 +1,15 @@
+import { useState, useEffect } from "react";
+import { apiFetch } from "../api";
+
 export default function Dashboard({ user, onNewScreening }) {
-  const history = JSON.parse(localStorage.getItem(`history_${user.email}`) || "[]");
+  const [history, setHistory] = useState([]);
+
+  useEffect(() => {
+    apiFetch("/history")
+      .then((r) => (r.ok ? r.json() : []))
+      .then(setHistory)
+      .catch(() => {});
+  }, []);
 
   const totalScreenings  = history.length;
   const totalCandidates  = history.reduce((s, h) => s + (h.candidate_count || 0), 0);

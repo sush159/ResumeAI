@@ -1,39 +1,42 @@
 import { useState } from "react";
 
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
+
 export default function LoginPage({ onLogin }) {
-  const [mode, setMode] = useState("signin");
-  const [form, setForm] = useState({ name: "", email: "", password: "" });
-  const [error, setError] = useState("");
+  const [mode,    setMode]    = useState("signin");
+  const [form,    setForm]    = useState({ name: "", email: "", password: "" });
+  const [error,   setError]   = useState("");
   const [loading, setLoading] = useState(false);
 
   const set = (field) => (e) => setForm((p) => ({ ...p, [field]: e.target.value }));
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
-    if (!form.email || !form.password) { setError("Please fill in all required fields."); return; }
-    if (mode === "signup" && !form.name)  { setError("Please enter your name."); return; }
-    if (form.password.length < 6)         { setError("Password must be at least 6 characters."); return; }
+    if (!form.email || !form.password)       { setError("Please fill in all required fields."); return; }
+    if (mode === "signup" && !form.name)     { setError("Please enter your name."); return; }
+    if (form.password.length < 6)            { setError("Password must be at least 6 characters."); return; }
 
     setLoading(true);
-    setTimeout(() => {
-      const accounts = JSON.parse(localStorage.getItem("resumeai_accounts") || "{}");
-      if (mode === "signin") {
-        const account = accounts[form.email];
-        if (!account || account.password !== form.password) {
-          setError("Invalid email or password."); setLoading(false); return;
-        }
-        onLogin({ email: form.email, name: account.name });
-      } else {
-        if (accounts[form.email]) {
-          setError("An account with this email already exists."); setLoading(false); return;
-        }
-        accounts[form.email] = { name: form.name, password: form.password };
-        localStorage.setItem("resumeai_accounts", JSON.stringify(accounts));
-        onLogin({ email: form.email, name: form.name });
-      }
+    try {
+      const endpoint = mode === "signin" ? "/auth/login" : "/auth/register";
+      const body     = mode === "signin"
+        ? { email: form.email, password: form.password }
+        : { email: form.email, name: form.name, password: form.password };
+
+      const res  = await fetch(`${API_BASE}${endpoint}`, {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.detail || "Something went wrong."); return; }
+      onLogin({ token: data.token, user: data.user });
+    } catch (err) {
+      setError("Cannot reach the server. Make sure the backend is running.");
+    } finally {
       setLoading(false);
-    }, 600);
+    }
   };
 
   return (

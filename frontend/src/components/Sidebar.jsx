@@ -106,10 +106,10 @@ export default function Sidebar({ user, page, setPage, onLogout, onNewScreening 
         borderRadius: 10,
       }}>
         <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text)", marginBottom: 4 }}>
-          Data stored locally
+          Data synced to database
         </div>
         <div style={{ fontSize: 11, color: "var(--text3)", lineHeight: 1.5 }}>
-          All screening history is saved in your browser.
+          Your history and templates are stored securely on the server.
         </div>
       </div>
 

@@ -1,6 +1,12 @@
 # Secrets
 backend/.env
 
+# Database (auto-created on server, never commit)
+backend/resumeai.db
+
+# Claude Code config
+.claude/
+
 # Python
 __pycache__/
 *.pyc

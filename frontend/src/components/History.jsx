@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { apiFetch } from "../api";
 
 const STATUSES  = ["To Review", "Contacted", "Interviewing", "Offer Sent", "Hired", "Declined"];
 const statusColor = (s) => ({
@@ -13,20 +14,41 @@ const statusColor = (s) => ({
 const recColor = (r) => ({ Shortlist: "var(--success)", Maybe: "var(--warning)", Reject: "var(--danger)" }[r] || "var(--text3)");
 
 export default function History({ user, onLoad }) {
-  const storageKey              = `history_${user.email}`;
-  const [history, setHistory]   = useState(() => JSON.parse(localStorage.getItem(storageKey) || "[]"));
+  const [history,  setHistory]  = useState([]);
   const [expanded, setExpanded] = useState(null);
 
-  const persist = (updated) => { setHistory(updated); localStorage.setItem(storageKey, JSON.stringify(updated)); };
+  useEffect(() => {
+    apiFetch("/history")
+      .then((r) => (r.ok ? r.json() : []))
+      .then(setHistory)
+      .catch(() => {});
+  }, []);
 
-  const deleteEntry = (id) => { persist(history.filter((h) => h.id !== id)); if (expanded === id) setExpanded(null); };
+  const deleteEntry = async (id) => {
+    try {
+      await apiFetch(`/history/${id}`, { method: "DELETE" });
+      setHistory((prev) => prev.filter((h) => h.id !== id));
+      if (expanded === id) setExpanded(null);
+    } catch (e) {
+      console.error("Failed to delete entry:", e);
+    }
+  };
 
-  const updateStatus = (entryId, candidateLabel, status) => {
-    const updated = history.map((h) => {
-      if (h.id !== entryId) return h;
-      return { ...h, statuses: { ...(h.statuses || {}), [candidateLabel]: status } };
-    });
-    persist(updated);
+  const updateStatus = async (entryId, candidateLabel, newStatus) => {
+    const entry    = history.find((h) => h.id === entryId);
+    if (!entry) return;
+    const statuses = { ...(entry.statuses || {}), [candidateLabel]: newStatus };
+    // Optimistic update
+    setHistory((prev) => prev.map((h) => h.id === entryId ? { ...h, statuses } : h));
+    try {
+      await apiFetch(`/history/${entryId}/statuses`, {
+        method:  "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ statuses }),
+      });
+    } catch (e) {
+      console.error("Failed to update status:", e);
+    }
   };
 
   const formatDate = (iso) => new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) +

@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
-import LoginPage     from "./components/LoginPage";
-import Sidebar       from "./components/Sidebar";
-import Dashboard     from "./components/Dashboard";
-import JDChecker     from "./components/JDChecker";
+import LoginPage      from "./components/LoginPage";
+import Sidebar        from "./components/Sidebar";
+import Dashboard      from "./components/Dashboard";
+import JDChecker      from "./components/JDChecker";
 import ResumeScreener from "./components/ResumeScreener";
-import Results       from "./components/Results";
-import History       from "./components/History";
+import Results        from "./components/Results";
+import History        from "./components/History";
+import { apiFetch, setToken, clearToken } from "./api";
 
 export default function App() {
   const [user,             setUser]             = useState(null);
@@ -15,40 +16,64 @@ export default function App() {
   const [screeningResults, setScreeningResults] = useState(null);
   const [currentSessionId, setCurrentSessionId] = useState(null);
 
+  // Restore session from stored token on page load
   useEffect(() => {
-    const stored = localStorage.getItem("resumeai_user");
-    if (stored) setUser(JSON.parse(stored));
+    const token = localStorage.getItem("resumeai_token");
+    if (!token) return;
+    apiFetch("/auth/me")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => { if (data) setUser(data); else clearToken(); })
+      .catch(() => clearToken());
   }, []);
 
-  const handleLogin  = (u) => { localStorage.setItem("resumeai_user", JSON.stringify(u)); setUser(u); };
+  const handleLogin = ({ token, user: u }) => {
+    setToken(token);
+    setUser(u);
+  };
+
   const handleLogout = () => {
-    localStorage.removeItem("resumeai_user");
+    clearToken();
     setUser(null); setPage("dashboard"); setStep("jd");
     setJdData({ text: "", analysis: null }); setScreeningResults(null); setCurrentSessionId(null);
   };
 
-  const handleResults = (data) => {
-    const sid = Date.now();
-    setCurrentSessionId(sid); setScreeningResults(data); setStep("results"); setPage("screening");
-    const key = `history_${user.email}`;
-    const history = JSON.parse(localStorage.getItem(key) || "[]");
-    history.unshift({
-      id: sid, date: new Date().toISOString(),
-      jd_preview: jdData.text.substring(0, 100), jd_text: jdData.text,
-      candidate_count: data.candidates.length,
-      shortlisted: data.candidates.filter((c) => c.recommendation === "Shortlist").length,
-      top_score: Math.max(...data.candidates.map((c) => c.overall_score || 0)),
-      results: data, statuses: {},
-    });
-    localStorage.setItem(key, JSON.stringify(history.slice(0, 50)));
+  // Save results to DB, then set session ID once we have the DB row ID
+  const handleResults = async (data) => {
+    setScreeningResults(data); setStep("results"); setPage("screening");
+    try {
+      const res = await apiFetch("/history", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          date:            new Date().toISOString(),
+          jd_preview:      jdData.text.substring(0, 100),
+          jd_text:         jdData.text,
+          candidate_count: data.candidates.length,
+          shortlisted:     data.candidates.filter((c) => c.recommendation === "Shortlist").length,
+          top_score:       Math.max(...data.candidates.map((c) => c.overall_score || 0)),
+          results:         data,
+        }),
+      });
+      if (res.ok) {
+        const { id } = await res.json();
+        setCurrentSessionId(id);
+      }
+    } catch (e) {
+      console.error("Failed to save screening session:", e);
+    }
   };
 
-  const handleStatusChange = (newStatuses) => {
-    if (!currentSessionId || !user) return;
-    const key = `history_${user.email}`;
-    const history = JSON.parse(localStorage.getItem(key) || "[]");
-    const idx = history.findIndex((h) => h.id === currentSessionId);
-    if (idx !== -1) { history[idx].statuses = newStatuses; localStorage.setItem(key, JSON.stringify(history)); }
+  const handleStatusChange = async (newStatuses) => {
+    if (!currentSessionId) return;
+    try {
+      await apiFetch(`/history/${currentSessionId}/statuses`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ statuses: newStatuses }),
+      });
+    } catch (e) {
+      console.error("Failed to update statuses:", e);
+    }
   };
 
   const startNewScreening = () => {

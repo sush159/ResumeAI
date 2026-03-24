@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { apiFetch } from "../api";
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
@@ -30,32 +31,50 @@ const StepBar = ({ current }) => (
 );
 
 export default function JDChecker({ user, jdData, setJdData, onNext }) {
-  const [loading,           setLoading]           = useState(false);
-  const [error,             setError]             = useState("");
-  const [showTemplates,     setShowTemplates]      = useState(false);
-  const [templateName,      setTemplateName]       = useState("");
-  const [showSaveInput,     setShowSaveInput]      = useState(false);
+  const [loading,       setLoading]       = useState(false);
+  const [error,         setError]         = useState("");
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [templateName,  setTemplateName]  = useState("");
+  const [showSaveInput, setShowSaveInput] = useState(false);
+  const [templates,     setTemplates]     = useState([]);
 
-  const templatesKey = `jd_templates_${user?.email}`;
-  const getTemplates = () => JSON.parse(localStorage.getItem(templatesKey) || "[]");
+  useEffect(() => {
+    apiFetch("/templates")
+      .then((r) => (r.ok ? r.json() : []))
+      .then(setTemplates)
+      .catch(() => {});
+  }, []);
 
-  const saveTemplate = () => {
+  const saveTemplate = async () => {
     if (!templateName.trim() || !jdData.text.trim()) return;
-    const templates = getTemplates();
-    templates.unshift({ id: Date.now(), name: templateName.trim(), text: jdData.text, date: new Date().toISOString() });
-    localStorage.setItem(templatesKey, JSON.stringify(templates.slice(0, 20)));
+    try {
+      const res  = await apiFetch("/templates", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ name: templateName.trim(), text: jdData.text }),
+      });
+      if (res.ok) {
+        const saved = await res.json();
+        setTemplates((prev) => [saved, ...prev]);
+      }
+    } catch (e) {
+      console.error("Failed to save template:", e);
+    }
     setTemplateName(""); setShowSaveInput(false);
   };
 
   const loadTemplate = (text) => { setJdData((p) => ({ ...p, text, analysis: null })); setShowTemplates(false); };
 
-  const deleteTemplate = (id) => {
-    const updated = getTemplates().filter((t) => t.id !== id);
-    localStorage.setItem(templatesKey, JSON.stringify(updated));
+  const deleteTemplate = async (id) => {
+    try {
+      await apiFetch(`/templates/${id}`, { method: "DELETE" });
+      setTemplates((prev) => prev.filter((t) => t.id !== id));
+    } catch (e) {
+      console.error("Failed to delete template:", e);
+    }
   };
 
-  const analysis     = jdData.analysis;
-  const templates    = getTemplates();
+  const analysis = jdData.analysis;
   const scoreColor   = (s) => s >= 75 ? "var(--success)" : s >= 50 ? "var(--warning)" : "var(--danger)";
   const verdictColor = (v) => ({ Good: "var(--success)", "Needs Improvement": "var(--warning)", Poor: "var(--danger)" }[v] || "var(--text2)");
 
@@ -110,7 +129,7 @@ export default function JDChecker({ user, jdData, setJdData, onNext }) {
               </div>
               <div style={{ display: "flex", gap: 8, flexShrink: 0, marginLeft: 16 }}>
                 <button className="btn btn-secondary btn-sm" onClick={() => loadTemplate(t.text)}>Load</button>
-                <button className="btn btn-sm" onClick={() => { deleteTemplate(t.id); setShowTemplates(false); setTimeout(() => setShowTemplates(true), 10); }}
+                <button className="btn btn-sm" onClick={() => deleteTemplate(t.id)}
                   style={{ background: "var(--danger-muted)", color: "var(--danger)", border: "1px solid rgba(239,68,68,0.2)" }}>
                   Delete
                 </button>
