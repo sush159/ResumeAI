@@ -395,10 +395,78 @@ async def screen_resumes(
 # ── Email Endpoint ─────────────────────────────────────────────────────────────
 import httpx
 
-class EmailRequest(BaseModel):
-    to_email: str
+# ── Email draft generator ──────────────────────────────────────────────────────
+class GenerateEmailDraftRequest(BaseModel):
+    email_type:      str        # "rejection" | "interview" | "offer"
     candidate_label: str
-    feedback_text: str
+    jd_preview:      str
+    overall_score:   int
+    recommendation:  str
+    summary:         str
+    strengths:       list
+    gaps:            list
+
+@app.post("/generate-email-draft")
+def generate_email_draft(
+    payload: GenerateEmailDraftRequest,
+    current_user: User = Depends(get_current_user),
+):
+    guidelines = {
+        "rejection": "Thank the candidate warmly. Mention 1-2 of their strengths. Explain they weren't selected at this time. Encourage them to apply for future roles. Be empathetic and professional.",
+        "interview": "Congratulate them on advancing. Express enthusiasm about their profile. Request their availability for an interview. Mention it will be a structured interview to learn more about their experience.",
+        "offer":     "Warmly congratulate them. Express excitement about them joining the team. Make a clear job offer. Outline the next steps for onboarding and ask them to confirm acceptance.",
+    }
+    prompt = f"""You are a professional HR communications specialist. Draft a {payload.email_type} email for a job candidate.
+
+Role applied for: {payload.jd_preview[:120]}
+Candidate: {payload.candidate_label}
+Score: {payload.overall_score}/100
+Recommendation: {payload.recommendation}
+Summary: {payload.summary}
+Strengths: {', '.join(payload.strengths or [])}
+Gaps: {', '.join(payload.gaps or [])}
+
+Guidelines:
+- Start with "Dear Candidate,"
+- {guidelines.get(payload.email_type, "")}
+- End with a warm closing and "Best regards,\\nThe Hiring Team"
+- Keep it professional, concise (3-5 paragraphs), and human.
+- Return ONLY the email body text. No subject line, no extra formatting."""
+
+    response = client.models.generate_content(model=GEMINI_MODEL, contents=prompt)
+    return {"email_text": response.text.strip()}
+
+
+# ── HTML email renderer ────────────────────────────────────────────────────────
+def _render_email_html(email_type: str, body: str) -> str:
+    colors = {"rejection": "#ef4444", "interview": "#3b82f6", "offer": "#22c55e"}
+    labels = {"rejection": "Application Update", "interview": "Interview Invitation", "offer": "Job Offer"}
+    color  = colors.get(email_type, "#6366f1")
+    label  = labels.get(email_type, "Update")
+    body_html = body.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br>")
+    return f"""<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;">
+  <div style="max-width:600px;margin:40px auto;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 32px rgba(0,0,0,0.10);">
+    <div style="background:{color};padding:36px 40px;">
+      <div style="font-size:24px;font-weight:800;color:#ffffff;letter-spacing:-0.5px;margin-bottom:6px;">ResumeAI</div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.75);letter-spacing:0.08em;text-transform:uppercase;">{label}</div>
+    </div>
+    <div style="padding:40px;font-size:15px;line-height:1.85;color:#1e293b;">{body_html}</div>
+    <div style="padding:24px 40px;background:#f8fafc;border-top:1px solid #e2e8f0;text-align:center;font-size:12px;color:#94a3b8;">
+      Sent via <strong style="color:#6366f1;">ResumeAI</strong> &nbsp;·&nbsp; AI-Powered Hiring Platform
+    </div>
+  </div>
+</body>
+</html>"""
+
+
+class EmailRequest(BaseModel):
+    to_email:        str
+    candidate_label: str
+    feedback_text:   str
+    email_type:      str = "rejection"
 
 @app.post("/send-email")
 async def send_email(payload: EmailRequest):
@@ -406,6 +474,15 @@ async def send_email(payload: EmailRequest):
     gmail_sender = os.getenv("GMAIL_USER", "")
     if not brevo_key or not gmail_sender:
         raise HTTPException(status_code=503, detail="Email service is not configured. Add BREVO_API_KEY and GMAIL_USER to your environment variables.")
+
+    subjects = {
+        "rejection": f"Your Application — {payload.candidate_label}",
+        "interview": f"Interview Invitation — {payload.candidate_label}",
+        "offer":     f"Job Offer — {payload.candidate_label} 🎉",
+    }
+    subject  = subjects.get(payload.email_type, f"Update — {payload.candidate_label}")
+    html     = _render_email_html(payload.email_type, payload.feedback_text)
+
     try:
         async with httpx.AsyncClient(timeout=30) as client:
             res = await client.post(
@@ -414,8 +491,8 @@ async def send_email(payload: EmailRequest):
                 json={
                     "sender":      {"name": "ResumeAI", "email": gmail_sender},
                     "to":          [{"email": payload.to_email}],
-                    "subject":     f"Your Application Update — {payload.candidate_label}",
-                    "textContent": payload.feedback_text,
+                    "subject":     subject,
+                    "htmlContent": html,
                 },
             )
         if res.status_code not in (200, 201):

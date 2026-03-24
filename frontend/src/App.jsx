@@ -99,7 +99,7 @@ export default function App() {
           <>
             {step === "jd"      && <JDChecker user={user} jdData={jdData} setJdData={setJdData} onNext={() => setStep("screen")} />}
             {step === "screen"  && <ResumeScreener jdText={jdData.text} onBack={() => setStep("jd")} onResults={handleResults} />}
-            {step === "results" && <Results results={screeningResults} onReset={startNewScreening} onStatusChange={handleStatusChange} sessionId={currentSessionId} user={user} />}
+            {step === "results" && <Results results={screeningResults} jdText={jdData.text} onReset={startNewScreening} onStatusChange={handleStatusChange} sessionId={currentSessionId} user={user} />}
           </>
         )}
       </main>

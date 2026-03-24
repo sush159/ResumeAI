@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { apiFetch } from "../api";
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
@@ -88,22 +89,61 @@ const ScoreBar = ({ label, score }) => (
   </div>
 );
 
-// Email Modal
-function EmailModal({ candidate, onClose }) {
-  const [email,   setEmail]   = useState("");
-  const [sending, setSending] = useState(false);
-  const [sent,    setSent]    = useState(false);
-  const [error,   setError]   = useState("");
-  const [status,  setStatus]  = useState("");
+// ── Email type config ─────────────────────────────────────────────────────────
+const EMAIL_TYPES = {
+  rejection: { label: "Rejection",            color: "#ef4444", desc: "Polite rejection with constructive feedback" },
+  interview: { label: "Interview Invitation",  color: "#3b82f6", desc: "Invite the candidate to an interview round"  },
+  offer:     { label: "Job Offer",             color: "#22c55e", desc: "Send a formal job offer"                     },
+};
 
-  // Poll until the server responds (handles Render free tier cold start)
+// ── Email Modal ───────────────────────────────────────────────────────────────
+function EmailModal({ candidate, jdPreview, onClose }) {
+  const [email,      setEmail]      = useState("");
+  const [emailType,  setEmailType]  = useState(null);
+  const [draft,      setDraft]      = useState("");
+  const [generating, setGenerating] = useState(false);
+  const [sending,    setSending]    = useState(false);
+  const [sent,       setSent]       = useState(false);
+  const [error,      setError]      = useState("");
+  const [status,     setStatus]     = useState("");
+
+  const isReject = candidate.recommendation === "Reject";
+
+  // Rejection candidates: auto-load existing AI draft
+  useEffect(() => {
+    if (isReject) { setEmailType("rejection"); setDraft(candidate.feedback_email || ""); }
+  }, []);
+
+  // Generate a fresh AI draft for the chosen type
+  const generateDraft = async (type) => {
+    setEmailType(type); setGenerating(true); setError(""); setDraft("");
+    try {
+      const res = await apiFetch("/generate-email-draft", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email_type:      type,
+          candidate_label: candidate.candidate_label,
+          jd_preview:      jdPreview || "",
+          overall_score:   candidate.overall_score  || 0,
+          recommendation:  candidate.recommendation || "",
+          summary:         candidate.summary        || "",
+          strengths:       candidate.strengths      || [],
+          gaps:            candidate.gaps           || [],
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to generate draft.");
+      const d = await res.json();
+      setDraft(d.email_text || "");
+    } catch (e) { setError(e.message || "Failed to generate draft."); }
+    finally { setGenerating(false); }
+  };
+
+  // Poll until server is awake (Render free tier cold start)
   const waitForServer = async (maxWaitMs = 90000) => {
     const start = Date.now();
     while (Date.now() - start < maxWaitMs) {
-      try {
-        const r = await fetch(`${API_BASE}/`);
-        if (r.ok) return true;
-      } catch {}
+      try { const r = await fetch(`${API_BASE}/`); if (r.ok) return true; } catch {}
       await new Promise((r) => setTimeout(r, 3000));
     }
     return false;
@@ -111,39 +151,44 @@ function EmailModal({ candidate, onClose }) {
 
   const handleSend = async () => {
     if (!email.trim()) { setError("Please enter a recipient email address."); return; }
+    if (!draft.trim()) { setError("Email draft is empty."); return; }
     setSending(true); setError(""); setStatus("");
     try {
       setStatus("Waking up server...");
-      const alive = await waitForServer();
-      if (!alive) throw new Error("Server did not respond in time. Please try again.");
-
+      if (!await waitForServer()) throw new Error("Server did not respond. Please try again.");
       setStatus("Sending email...");
       const res = await fetch(`${API_BASE}/send-email`, {
-        method: "POST",
+        method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ to_email: email, candidate_label: candidate.candidate_label, feedback_text: candidate.feedback_email }),
+        body: JSON.stringify({ to_email: email, candidate_label: candidate.candidate_label, feedback_text: draft, email_type: emailType }),
       });
       const d = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(d.detail || `Error ${res.status}`);
       setSent(true);
-    } catch (e) {
-      setError(e.message || "Failed to send email.");
-    } finally { setSending(false); setStatus(""); }
+    } catch (e) { setError(e.message || "Failed to send email."); }
+    finally { setSending(false); setStatus(""); }
   };
+
+  // Options shown to HR for non-reject candidates
+  const typeOptions = isReject ? [] : candidate.recommendation === "Shortlist"
+    ? ["interview", "offer"]
+    : ["interview", "offer", "rejection"];   // Maybe → all three
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal fade-up" onClick={(e) => e.stopPropagation()}>
+      <div className="modal fade-up" style={{ maxWidth: 520 }} onClick={(e) => e.stopPropagation()}>
+
         {/* Header */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}>
           <div>
-            <div style={{ fontSize: 16, fontWeight: 700, color: "var(--text)", letterSpacing: "-0.02em" }}>Send Feedback Email</div>
-            <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 2 }}>{candidate.candidate_label}</div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: "var(--text)", letterSpacing: "-0.02em" }}>Send Email</div>
+            <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 2 }}>{candidate.candidate_label} · Score {candidate.overall_score}</div>
           </div>
           <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--text3)", cursor: "pointer", fontSize: 20, lineHeight: 1, padding: "4px 8px" }}>×</button>
         </div>
 
         {sent ? (
+          /* ── Success ── */
           <div style={{ textAlign: "center", padding: "28px 0" }}>
             <div style={{
               width: 56, height: 56, borderRadius: "50%", margin: "0 auto 16px",
@@ -154,36 +199,93 @@ function EmailModal({ candidate, onClose }) {
                 <path d="M5 12l4.5 4.5L19 7" stroke="var(--success)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </div>
-            <div style={{ fontSize: 16, fontWeight: 600, color: "var(--text)", marginBottom: 6 }}>Email sent successfully</div>
-            <div style={{ fontSize: 13, color: "var(--text3)" }}>Feedback sent to {email}</div>
+            <div style={{ fontSize: 16, fontWeight: 600, color: "var(--text)", marginBottom: 6 }}>Email sent!</div>
+            <div style={{ fontSize: 13, color: "var(--text3)" }}>{EMAIL_TYPES[emailType]?.label} sent to {email}</div>
             <button className="btn btn-secondary btn-sm" onClick={onClose} style={{ marginTop: 20 }}>Close</button>
           </div>
         ) : (
           <>
-            <div style={{ marginBottom: 16 }}>
-              <label>Recipient Email Address</label>
-              <input type="email" placeholder="candidate@email.com" value={email} onChange={(e) => setEmail(e.target.value)} />
-            </div>
-            <div style={{ marginBottom: 20 }}>
-              <label>Feedback Message</label>
+            {/* ── Auto-rejection notice ── */}
+            {isReject && (
               <div style={{
-                padding: 14, background: "var(--surface2)", border: "1px solid var(--border2)",
-                borderRadius: 9, fontSize: 13, color: "var(--text2)", lineHeight: 1.7,
-                maxHeight: 180, overflowY: "auto",
+                padding: "10px 14px", borderRadius: 9, fontSize: 13, marginBottom: 18,
+                background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", color: "#ef4444",
+                display: "flex", alignItems: "center", gap: 8,
               }}>
-                {candidate.feedback_email}
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="6" stroke="#ef4444" strokeWidth="1.3"/><path d="M7 4v3.5M7 9.5v.5" stroke="#ef4444" strokeWidth="1.3" strokeLinecap="round"/></svg>
+                Low score — a <strong>&nbsp;rejection draft&nbsp;</strong> has been prepared. You can edit it below.
               </div>
-            </div>
+            )}
+
+            {/* ── Email type selector ── */}
+            {!isReject && (
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ marginBottom: 10, display: "block" }}>Choose Email Type</label>
+                <div style={{ display: "grid", gridTemplateColumns: `repeat(${typeOptions.length}, 1fr)`, gap: 8 }}>
+                  {typeOptions.map((type) => {
+                    const cfg = EMAIL_TYPES[type];
+                    const active = emailType === type;
+                    return (
+                      <button key={type} onClick={() => generateDraft(type)} disabled={generating}
+                        style={{
+                          padding: "12px 8px", borderRadius: 10, cursor: "pointer", textAlign: "center", transition: "all 0.15s",
+                          border:      `1.5px solid ${active ? cfg.color : "var(--border2)"}`,
+                          background:  active ? cfg.color + "15" : "var(--surface2)",
+                          color:       active ? cfg.color : "var(--text2)",
+                          opacity:     generating && !active ? 0.5 : 1,
+                        }}>
+                        <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 3 }}>{cfg.label}</div>
+                        <div style={{ fontSize: 11, lineHeight: 1.3, color: active ? cfg.color + "bb" : "var(--text3)" }}>{cfg.desc}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* ── Generating spinner ── */}
+            {generating && (
+              <div style={{ textAlign: "center", padding: "20px 0", color: "var(--text3)", fontSize: 13 }}>
+                <span className="spinner" style={{ marginRight: 8 }} />Generating AI draft...
+              </div>
+            )}
+
+            {/* ── Editable draft ── */}
+            {draft && !generating && (
+              <>
+                <div style={{ marginBottom: 14 }}>
+                  <label>Recipient Email</label>
+                  <input type="email" placeholder="candidate@email.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+                </div>
+                <div style={{ marginBottom: 18 }}>
+                  <label style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span>Email Draft</span>
+                    <span style={{ fontSize: 11, color: "var(--text3)", fontWeight: 400 }}>AI-generated · editable</span>
+                  </label>
+                  <textarea
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    rows={9}
+                    style={{ fontFamily: "inherit", fontSize: 13, lineHeight: 1.75, resize: "vertical" }}
+                  />
+                </div>
+              </>
+            )}
+
             {error && (
               <div style={{ padding: "10px 14px", background: "var(--danger-muted)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: 8, fontSize: 13, color: "var(--danger)", marginBottom: 16 }}>
                 {error}
               </div>
             )}
+
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
               <button className="btn btn-secondary btn-sm" onClick={onClose}>Cancel</button>
-              <button className="btn btn-primary btn-sm" onClick={handleSend} disabled={sending}>
-                {sending ? <><span className="spinner" />{status || "Sending..."}</> : "Send Email"}
-              </button>
+              {draft && !generating && (
+                <button className="btn btn-primary btn-sm" onClick={handleSend} disabled={sending || !email.trim()}
+                  style={{ background: EMAIL_TYPES[emailType]?.color }}>
+                  {sending ? <><span className="spinner" />{status || "Sending..."}</> : `Send ${EMAIL_TYPES[emailType]?.label || "Email"}`}
+                </button>
+              )}
             </div>
           </>
         )}
@@ -192,7 +294,7 @@ function EmailModal({ candidate, onClose }) {
   );
 }
 
-function CandidateCard({ candidate, rank, status, onStatusChange }) {
+function CandidateCard({ candidate, rank, status, onStatusChange, jdPreview }) {
   const [expanded,  setExpanded]  = useState(false);
   const [showEmail, setShowEmail] = useState(false);
 
@@ -216,7 +318,7 @@ function CandidateCard({ candidate, rank, status, onStatusChange }) {
 
   return (
     <>
-      {showEmail && <EmailModal candidate={candidate} onClose={() => setShowEmail(false)} />}
+      {showEmail && <EmailModal candidate={candidate} jdPreview={jdPreview} onClose={() => setShowEmail(false)} />}
       <div style={{
         background: "var(--surface)", border: `1px solid ${expanded ? "rgba(99,102,241,0.3)" : "var(--border)"}`,
         borderRadius: 14, padding: "18px 22px", marginBottom: 10,
@@ -345,13 +447,8 @@ function CandidateCard({ candidate, rank, status, onStatusChange }) {
   );
 }
 
-export default function Results({ results, onReset, onStatusChange, sessionId, user }) {
-  const [statuses, setStatuses] = useState(() => {
-    if (!sessionId || !user) return {};
-    const history = JSON.parse(localStorage.getItem(`history_${user?.email}`) || "[]");
-    const entry   = history.find((h) => h.id === sessionId);
-    return entry?.statuses || {};
-  });
+export default function Results({ results, jdText, onReset, onStatusChange, sessionId, user }) {
+  const [statuses, setStatuses] = useState({});
 
   if (!results?.candidates) return null;
   const candidates  = results.candidates;
@@ -436,6 +533,7 @@ export default function Results({ results, onReset, onStatusChange, sessionId, u
             rank={i + 1}
             status={statuses[c.candidate_label]}
             onStatusChange={handleStatusChange}
+            jdPreview={jdText?.substring(0, 150) || ""}
           />
         ))}
       </div>
