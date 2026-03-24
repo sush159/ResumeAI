@@ -92,42 +92,43 @@ const ScoreBar = ({ label, score }) => (
 function EmailModal({ candidate, onClose }) {
   const [email,   setEmail]   = useState("");
   const [sending, setSending] = useState(false);
-
-  // Silently ping the server as soon as the modal opens so it wakes up
-  useEffect(() => { fetch(`${API_BASE}/`).catch(() => {}); }, []);
   const [sent,    setSent]    = useState(false);
   const [error,   setError]   = useState("");
+  const [status,  setStatus]  = useState("");
+
+  // Poll until the server responds (handles Render free tier cold start)
+  const waitForServer = async (maxWaitMs = 90000) => {
+    const start = Date.now();
+    while (Date.now() - start < maxWaitMs) {
+      try {
+        const r = await fetch(`${API_BASE}/`);
+        if (r.ok) return true;
+      } catch {}
+      await new Promise((r) => setTimeout(r, 3000));
+    }
+    return false;
+  };
 
   const handleSend = async () => {
     if (!email.trim()) { setError("Please enter a recipient email address."); return; }
-    setSending(true); setError("");
+    setSending(true); setError(""); setStatus("");
     try {
-      // Wake the server first (free tier may be sleeping)
-      await fetch(`${API_BASE}/`).catch(() => {});
-      // Small buffer to let it fully start
-      await new Promise((r) => setTimeout(r, 3000));
+      setStatus("Waking up server...");
+      const alive = await waitForServer();
+      if (!alive) throw new Error("Server did not respond in time. Please try again.");
 
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 90000);
-      try {
-        const res = await fetch(`${API_BASE}/send-email`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ to_email: email, candidate_label: candidate.candidate_label, feedback_text: candidate.feedback_email }),
-          signal: controller.signal,
-        });
-        clearTimeout(timeout);
-        const d = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(d.detail || `Error ${res.status}`);
-        setSent(true);
-      } catch (e) {
-        clearTimeout(timeout);
-        if (e.name === "AbortError") setError("Request timed out. Please try again.");
-        else throw e;
-      }
+      setStatus("Sending email...");
+      const res = await fetch(`${API_BASE}/send-email`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to_email: email, candidate_label: candidate.candidate_label, feedback_text: candidate.feedback_email }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d.detail || `Error ${res.status}`);
+      setSent(true);
     } catch (e) {
       setError(e.message || "Failed to send email.");
-    } finally { setSending(false); }
+    } finally { setSending(false); setStatus(""); }
   };
 
   return (
@@ -181,7 +182,7 @@ function EmailModal({ candidate, onClose }) {
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
               <button className="btn btn-secondary btn-sm" onClick={onClose}>Cancel</button>
               <button className="btn btn-primary btn-sm" onClick={handleSend} disabled={sending}>
-                {sending ? <><span className="spinner" />Sending...</> : "Send Email"}
+                {sending ? <><span className="spinner" />{status || "Sending..."}</> : "Send Email"}
               </button>
             </div>
           </>
