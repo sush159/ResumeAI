@@ -1,14 +1,21 @@
+import os
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, Text, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime
 
-SQLALCHEMY_DATABASE_URL = "sqlite:///./resumeai.db"
+# On Render, DATABASE_URL is set automatically when you attach a Postgres database.
+# Locally it falls back to SQLite so you don't need any extra setup.
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./resumeai.db")
 
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL,
-    connect_args={"check_same_thread": False},
-)
+# Render supplies a legacy "postgres://" URL; SQLAlchemy 2.x requires "postgresql://"
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
+# check_same_thread is a SQLite-only argument
+connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
+
+engine = create_engine(DATABASE_URL, connect_args=connect_args)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
