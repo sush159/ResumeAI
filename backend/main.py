@@ -410,8 +410,11 @@ def _send_via_gmail(gmail_user: str, gmail_password: str, to_email: str, subject
     msg["To"]      = to_email
     msg["Subject"] = subject
     msg.attach(MIMEText(body, "plain"))
-    with smtplib.SMTP("smtp.gmail.com", 587) as server:
+    # 30s timeout so SMTP never hangs indefinitely
+    with smtplib.SMTP("smtp.gmail.com", 587, timeout=30) as server:
+        server.ehlo()
         server.starttls()
+        server.ehlo()
         server.login(gmail_user, gmail_password)
         server.sendmail(gmail_user, to_email, msg.as_string())
 
@@ -433,5 +436,9 @@ async def send_email(payload: EmailRequest):
         return {"success": True}
     except smtplib.SMTPAuthenticationError:
         raise HTTPException(status_code=401, detail="Gmail authentication failed. Make sure you're using an App Password, not your regular Gmail password.")
+    except smtplib.SMTPException as e:
+        raise HTTPException(status_code=502, detail=f"SMTP error: {str(e)}")
+    except TimeoutError:
+        raise HTTPException(status_code=504, detail="Connection to Gmail timed out. Please try again.")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"{type(e).__name__}: {str(e)}")
