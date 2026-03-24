@@ -1,12 +1,12 @@
 """
 AI Resume Screener - Backend API
-Built with FastAPI + Google Gemini API + SQLite
+Built with FastAPI + Google Gemini API + PostgreSQL
 
 Layers:
 1. Auth    — register/login with bcrypt-hashed passwords + JWT tokens
-2. Data    — history & JD templates stored in SQLite via SQLAlchemy
+2. Data    — history & JD templates stored in PostgreSQL via SQLAlchemy
 3. AI      — PDF extraction, anonymization, Gemini scoring, JD quality check
-4. Email   — candidate feedback emails via Resend
+4. Email   — candidate feedback emails via Gmail SMTP
 """
 
 from dotenv import load_dotenv
@@ -393,34 +393,45 @@ async def screen_resumes(
 
 
 # ── Email Endpoint ─────────────────────────────────────────────────────────────
-import httpx
+import smtplib
+import asyncio
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 class EmailRequest(BaseModel):
     to_email: str
     candidate_label: str
     feedback_text: str
 
+def _send_via_gmail(gmail_user: str, gmail_password: str, to_email: str, subject: str, body: str):
+    """Synchronous Gmail SMTP send — runs in a thread pool so it doesn't block."""
+    msg = MIMEMultipart()
+    msg["From"]    = f"ResumeAI <{gmail_user}>"
+    msg["To"]      = to_email
+    msg["Subject"] = subject
+    msg.attach(MIMEText(body, "plain"))
+    with smtplib.SMTP("smtp.gmail.com", 587) as server:
+        server.starttls()
+        server.login(gmail_user, gmail_password)
+        server.sendmail(gmail_user, to_email, msg.as_string())
+
 @app.post("/send-email")
 async def send_email(payload: EmailRequest):
-    resend_key = os.getenv("RESEND_API_KEY", "")
-    if not resend_key:
-        raise HTTPException(status_code=503, detail="Email service is not configured. Please add RESEND_API_KEY to your environment variables.")
+    gmail_user     = os.getenv("GMAIL_USER", "")
+    gmail_password = os.getenv("GMAIL_APP_PASSWORD", "")
+    if not gmail_user or not gmail_password:
+        raise HTTPException(status_code=503, detail="Email service is not configured. Add GMAIL_USER and GMAIL_APP_PASSWORD to your environment variables.")
     try:
-        async with httpx.AsyncClient() as client:
-            res = await client.post(
-                "https://api.resend.com/emails",
-                headers={"Authorization": f"Bearer {resend_key}", "Content-Type": "application/json"},
-                json={
-                    "from":    "ResumeAI <onboarding@resend.dev>",
-                    "to":      [payload.to_email],
-                    "subject": f"Your Application Update — {payload.candidate_label}",
-                    "text":    payload.feedback_text,
-                },
-            )
-        if res.status_code not in (200, 201):
-            raise HTTPException(status_code=502, detail=f"Email provider error: {res.text}")
+        await asyncio.to_thread(
+            _send_via_gmail,
+            gmail_user,
+            gmail_password,
+            payload.to_email,
+            f"Your Application Update — {payload.candidate_label}",
+            payload.feedback_text,
+        )
         return {"success": True}
-    except HTTPException:
-        raise
+    except smtplib.SMTPAuthenticationError:
+        raise HTTPException(status_code=401, detail="Gmail authentication failed. Make sure you're using an App Password, not your regular Gmail password.")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
