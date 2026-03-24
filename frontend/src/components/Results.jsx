@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
@@ -92,29 +92,41 @@ const ScoreBar = ({ label, score }) => (
 function EmailModal({ candidate, onClose }) {
   const [email,   setEmail]   = useState("");
   const [sending, setSending] = useState(false);
+
+  // Silently ping the server as soon as the modal opens so it wakes up
+  useEffect(() => { fetch(`${API_BASE}/`).catch(() => {}); }, []);
   const [sent,    setSent]    = useState(false);
   const [error,   setError]   = useState("");
 
   const handleSend = async () => {
     if (!email.trim()) { setError("Please enter a recipient email address."); return; }
     setSending(true); setError("");
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 90000);
     try {
-      const res = await fetch(`${API_BASE}/send-email`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ to_email: email, candidate_label: candidate.candidate_label, feedback_text: candidate.feedback_email }),
-        signal: controller.signal,
-      });
-      clearTimeout(timeout);
-      const d = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(d.detail || `Error ${res.status}`);
-      setSent(true);
+      // Wake the server first (free tier may be sleeping)
+      await fetch(`${API_BASE}/`).catch(() => {});
+      // Small buffer to let it fully start
+      await new Promise((r) => setTimeout(r, 3000));
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 90000);
+      try {
+        const res = await fetch(`${API_BASE}/send-email`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ to_email: email, candidate_label: candidate.candidate_label, feedback_text: candidate.feedback_email }),
+          signal: controller.signal,
+        });
+        clearTimeout(timeout);
+        const d = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(d.detail || `Error ${res.status}`);
+        setSent(true);
+      } catch (e) {
+        clearTimeout(timeout);
+        if (e.name === "AbortError") setError("Request timed out. Please try again.");
+        else throw e;
+      }
     } catch (e) {
-      clearTimeout(timeout);
-      if (e.name === "AbortError") setError("Request timed out. The server is still waking up — please try again in a moment.");
-      else setError(e.message || "Failed to send email.");
+      setError(e.message || "Failed to send email.");
     } finally { setSending(false); }
   };
 
